@@ -26,12 +26,12 @@ export default {
 
 const CHANNEL_ID = "@ZhostTech";
 const BOT_USERNAME = "zhost_tt_bot"; // ⚠️ @ မပါဘဲ သင့် Bot Username ကို ထည့်ပါ
+const ADMIN_ID = "7712004950"; // 👑 သင့် Admin ID
 
 // ═══════════════════════════════════════════════
 //  Helper Functions
 // ═══════════════════════════════════════════════
 async function apiCall(token, method, payload) {
-  // HTML Tags တွေ အလုပ်လုပ်ဖို့ သေချာအောင် parse_mode ထည့်မယ်
   if ((method === "sendMessage" || method === "editMessageText") && !payload.parse_mode) {
     payload.parse_mode = "HTML";
   }
@@ -99,11 +99,12 @@ async function handleMessage(message, env) {
     return;
   }
 
+  // Menu ခလုတ်များ (VIP ခလုတ် အသစ်ပါဝင်သည်)
   const bottomMenu = {
     keyboard: [
       [{ text: "🚀 Boost လုပ်မယ်" }],
       [{ text: "💳 အကောင့်အချက်အလက်" }, { text: "🎁 Daily Reward" }],
-      [{ text: "👥 သူငယ်ချင်းခေါ်မယ် (Refer)" }]
+      [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းခေါ်မယ် (Refer)" }]
     ], resize_keyboard: true
   };
 
@@ -153,6 +154,23 @@ async function handleMessage(message, env) {
     return;
   }
 
+  // 💎 VIP စနစ် အသစ်
+  if (text === "💎 VIP ဝင်မယ်") {
+    const vipText = `💎 <b>ZHOST VIP Package</b>\n\n💰 စျေးနှုန်း: 2000ks\n🎁 ရရှိမည့် အကျိုးခံစားခွင့်: 500 Coins\n\nVIP ဝင်လိုပါက @ZawMyoNaing_Official ဆီကို ဆက်သွယ်ပေးပါ။\n\n<i>(သင့်တောင်းဆိုမှုကို Admin ဆီသို့ အသိပေးပို့ထားပါသည်။)</i>`;
+    const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, vipText, bottomMenu);
+    await updateLastMsgId(env, chatId, res.result.message_id);
+
+    // Admin ဆီကို အသိပေးစာ ပို့မယ်
+    await apiCall(env.BOT_TOKEN, "sendMessage", {
+      chat_id: ADMIN_ID,
+      text: `🔔 <b>VIP တောင်းဆိုမှု အသစ်!</b>\n\n👤 အမည်: ${username}\n🆔 ID: <code>${chatId}</code>\n\nဒီ User ကို VIP ပေးမလား?`,
+      reply_markup: {
+        inline_keyboard: [[{ text: "✅ VIP Confirm (+500 Coins)", callback_data: `admin_vip_confirm_${chatId}` }]]
+      }
+    });
+    return;
+  }
+
   if (text === "👥 သူငယ်ချင်းခေါ်မယ် (Refer)") {
     const refLink = `https://t.me/${BOT_USERNAME}?start=ref_${chatId}`;
     const refText = `👥 <b>Refer & Earn</b>\n\nသူငယ်ချင်းတွေကို ဒီ Link လေး Share ပေးလိုက်ပါ။\nသူတို့ <b>Channel Join လုပ်တာနဲ့</b> သင့်ဆီကို <b>4 Coins</b> ရောက်လာပါလိမ့်မယ်။\n\n<code>${refLink}</code>`;
@@ -181,9 +199,36 @@ async function handleCallback(query, env) {
     keyboard: [
       [{ text: "🚀 Boost လုပ်မယ်" }],
       [{ text: "💳 အကောင့်အချက်အလက်" }, { text: "🎁 Daily Reward" }],
-      [{ text: "👥 သူငယ်ချင်းခေါ်မယ် (Refer)" }]
+      [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းခေါ်မယ် (Refer)" }]
     ], resize_keyboard: true
   };
+
+  // 👑 Admin မှ VIP Confirm နှိပ်ခြင်း
+  if (data.startsWith("admin_vip_confirm_")) {
+    if (chatId !== ADMIN_ID) {
+      await apiCall(env.BOT_TOKEN, "answerCallbackQuery", { callback_query_id: query.id, text: "⛔ Admin ပဲ နှိပ်လို့ရပါတယ်။", show_alert: true });
+      return;
+    }
+
+    const targetUserId = data.replace("admin_vip_confirm_", "");
+    
+    // User ဆီကို 500 Coins ထည့်မယ်
+    await env.DB.prepare("UPDATE users SET coins = coins + 500 WHERE user_id = ?").bind(targetUserId).run();
+
+    // User ဆီကို အသိပေးစာ ပို့မယ်
+    await apiCall(env.BOT_TOKEN, "sendMessage", {
+      chat_id: targetUserId,
+      text: "🎉 <b>ဂုဏ်ယူပါတယ်! သင်ဟာ ZHOST VIP ဖြစ်သွားပါပြီ။</b>\n\n💰 သင့်အကောင့်ထဲကို <b>500 Coins</b> ထည့်သွင်းပြီးပါပြီ။"
+    });
+
+    // Admin ဆီကို အောင်မြင်ကြောင်း ပြန်ပြမယ်
+    await apiCall(env.BOT_TOKEN, "editMessageText", {
+      chat_id: ADMIN_ID,
+      message_id: messageId,
+      text: `✅ <b>VIP Confirm လုပ်ပြီးပါပြီ။</b>\nUser ID: <code>${targetUserId}</code> ဆီကို 500 Coins ထည့်ပေးလိုက်ပါပြီ။`
+    });
+    return;
+  }
 
   if (data === "check_join") {
     const joined = await checkJoin(env.BOT_TOKEN, chatId);
@@ -227,7 +272,7 @@ async function processBoost(chatId, username, tiktokUrl, user, env, type) {
     keyboard: [
       [{ text: "🚀 Boost လုပ်မယ်" }],
       [{ text: "💳 အကောင့်အချက်အလက်" }, { text: "🎁 Daily Reward" }],
-      [{ text: "👥 သူငယ်ချင်းခေါ်မယ် (Refer)" }]
+      [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းခေါ်မယ် (Refer)" }]
     ], resize_keyboard: true
   };
 
@@ -284,10 +329,9 @@ async function processLeofame(type, tiktokUrl) {
   };
   
   try {
-    // ၁။ GET Request ပို့ပြီး Cookie နဲ့ Token ယူမယ်
     const getRes = await fetch(baseUrl, { headers });
     const html = await getRes.text();
-    const setCookie = getRes.headers.get("set-cookie"); // 🍪 Cookie ကို ယူမယ်
+    const setCookie = getRes.headers.get("set-cookie");
     const tokenMatch = html.match(/name="token"\s+value="([^"]+)"/);
     
     if (!tokenMatch) throw new Error("Token ရှာမတွေ့ပါ။ (Cloudflare Block ဖြစ်နိုင်ပါသည်)");
@@ -306,10 +350,7 @@ async function processLeofame(type, tiktokUrl) {
       "Accept": "application/json, text/javascript, */*; q=0.01"
     };
     
-    // 🍪 ရလာတဲ့ Cookie ကို POST မှာ ထည့်ပို့မယ်
-    if (setCookie) {
-      postHeaders["Cookie"] = setCookie;
-    }
+    if (setCookie) postHeaders["Cookie"] = setCookie;
 
     const postRes = await fetch(baseUrl + "?api=1", { method: "POST", headers: postHeaders, body: formData.toString() });
     const result = await postRes.text();
