@@ -25,12 +25,17 @@ export default {
 };
 
 const CHANNEL_ID = "@ZhostTech";
-const BOT_USERNAME = "zhost_tt_bot"; // ⚠️ ဒီနေရာမှာ @ မပါဘဲ သင့် Bot Username ကို ထည့်ပါ
+const BOT_USERNAME = "zhost_tt_bot"; // ⚠️ @ မပါဘဲ သင့် Bot Username ကို ထည့်ပါ
 
 // ═══════════════════════════════════════════════
 //  Helper Functions
 // ═══════════════════════════════════════════════
 async function apiCall(token, method, payload) {
+  // HTML Tags တွေ အလုပ်လုပ်ဖို့ သေချာအောင် parse_mode ထည့်မယ်
+  if ((method === "sendMessage" || method === "editMessageText") && !payload.parse_mode) {
+    payload.parse_mode = "HTML";
+  }
+  
   const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
   });
@@ -44,17 +49,13 @@ async function deleteMessage(token, chatId, messageId) {
   } catch (e) {}
 }
 
-// စာဟောင်းကို ဖျက်ပြီး စာအသစ်ပို့တဲ့ Function (Chat သန့်ရှင်းရေး)
 async function sendCleanMessage(token, chatId, user, text, replyMarkup = null) {
   if (user && user.last_msg_id) {
     await deleteMessage(token, chatId, user.last_msg_id);
   }
-  
-  const payload = { chat_id: chatId, text: text, parse_mode: "HTML" };
+  const payload = { chat_id: chatId, text: text };
   if (replyMarkup) payload.reply_markup = replyMarkup;
-  
-  const res = await apiCall(token, "sendMessage", payload);
-  return res;
+  return await apiCall(token, "sendMessage", payload);
 }
 
 async function updateLastMsgId(env, chatId, messageId) {
@@ -86,37 +87,29 @@ async function handleMessage(message, env) {
   if (isNewUser) {
     let referredBy = null;
     if (text.startsWith("/start ref_")) referredBy = text.replace("/start ref_", "");
-    
-    await env.DB.prepare("INSERT INTO users (user_id, username, coins, referred_by, refer_rewarded, pending_action, last_msg_id) VALUES (?, ?, 0, ?, 0, NULL, 0)")
-      .bind(chatId, username, referredBy).run();
+    await env.DB.prepare("INSERT INTO users (user_id, username, coins, referred_by, refer_rewarded, pending_action, last_msg_id) VALUES (?, ?, 0, ?, 0, NULL, 0)").bind(chatId, username, referredBy).run();
     user = { user_id: chatId, coins: 0, referred_by: referredBy, refer_rewarded: 0, pending_action: null, last_msg_id: 0 };
   }
 
   const joined = await checkJoin(env.BOT_TOKEN, chatId);
   if (!joined) {
-    const keyboard = { inline_keyboard: [
-      [{ text: "📢 Join Channel", url: "https://t.me/ZhostTech" }],
-      [{ text: "✅ Join ပြီးပါပြီ", callback_data: "check_join" }]
-    ]};
+    const keyboard = { inline_keyboard: [[{ text: "📢 Join Channel", url: "https://t.me/ZhostTech" }], [{ text: "✅ Join ပြီးပါပြီ", callback_data: "check_join" }]] };
     const res = await apiCall(env.BOT_TOKEN, "sendMessage", { chat_id: chatId, text: `ဟေး ${username} ရေ... 👋\nအရင်ဆုံး ကျွန်တော်တို့ရဲ့ <b>ZHOST Tech</b> Channel လေးကို Join ပေးပါဦးနော်။`, reply_markup: keyboard });
     await updateLastMsgId(env, chatId, res.result.message_id);
     return;
   }
 
-  // အောက်ခြေ Menu ခလုတ်တွေ နှိပ်လား စစ်မယ်
   const bottomMenu = {
     keyboard: [
       [{ text: "🚀 Boost လုပ်မယ်" }],
       [{ text: "💳 အကောင့်အချက်အလက်" }, { text: "🎁 Daily Reward" }],
       [{ text: "👥 သူငယ်ချင်းခေါ်မယ် (Refer)" }]
-    ],
-    resize_keyboard: true
+    ], resize_keyboard: true
   };
 
-  // အကယ်၍ Link ပို့လာရင်
   if (text.startsWith("http")) {
     if (user.pending_action === "views" || user.pending_action === "likes") {
-      await deleteMessage(env.BOT_TOKEN, chatId, message.message_id); // User ရဲ့ Link ကို ဖျက်မယ်
+      await deleteMessage(env.BOT_TOKEN, chatId, message.message_id);
       await processBoost(chatId, username, text, user, env, user.pending_action);
     } else {
       const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, "⚠️ ကျေးဇူးပြုပြီး အောက်ခြေက <b>🚀 Boost လုပ်မယ်</b> ခလုတ်ကနေ အရင်ရွေးပေးပါဦး။", bottomMenu);
@@ -132,12 +125,7 @@ async function handleMessage(message, env) {
   }
 
   if (text === "🚀 Boost လုပ်မယ်") {
-    const inlineMenu = {
-      inline_keyboard: [
-        [{ text: "👁️ View Boost (1 Coin)", callback_data: "boost_view" }],
-        [{ text: "❤️ Like Boost (1 Coin)", callback_data: "boost_like" }]
-      ]
-    };
+    const inlineMenu = { inline_keyboard: [[{ text: "👁️ View Boost (1 Coin)", callback_data: "boost_view" }], [{ text: "❤️ Like Boost (1 Coin)", callback_data: "boost_like" }]] };
     const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, `🚀 <b>ဘယ်ဟာကို Boost လုပ်ချင်တာလဲ ရွေးလိုက်ပါဦး?</b>`, inlineMenu);
     await updateLastMsgId(env, chatId, res.result.message_id);
     return;
@@ -153,9 +141,8 @@ async function handleMessage(message, env) {
 
   if (text === "🎁 Daily Reward") {
     const now = Math.floor(Date.now() / 1000);
-    const oneDay = 86400;
-    if (now - user.last_daily < oneDay) {
-      const hoursLeft = Math.ceil((oneDay - (now - user.last_daily)) / 3600);
+    if (now - user.last_daily < 86400) {
+      const hoursLeft = Math.ceil((86400 - (now - user.last_daily)) / 3600);
       const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, `⏳ ဒီနေ့အတွက် ယူပြီးသားဖြစ်နေတယ်နော်။ နောက် <b>${hoursLeft} နာရီ</b> လောက်နေမှ ပြန်ယူလို့ရပါမယ်။`, bottomMenu);
       await updateLastMsgId(env, chatId, res.result.message_id);
     } else {
@@ -174,7 +161,6 @@ async function handleMessage(message, env) {
     return;
   }
 
-  // တခြား စာတွေဆိုရင်
   const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, `😅 နားမလည်လိုက်ဘူးနော်။ အောက်က Menu လေးတွေကို နှိပ်ကြည့်ပါဦး။`, bottomMenu);
   await updateLastMsgId(env, chatId, res.result.message_id);
 }
@@ -196,8 +182,7 @@ async function handleCallback(query, env) {
       [{ text: "🚀 Boost လုပ်မယ်" }],
       [{ text: "💳 အကောင့်အချက်အလက်" }, { text: "🎁 Daily Reward" }],
       [{ text: "👥 သူငယ်ချင်းခေါ်မယ် (Refer)" }]
-    ],
-    resize_keyboard: true
+    ], resize_keyboard: true
   };
 
   if (data === "check_join") {
@@ -220,7 +205,6 @@ async function handleCallback(query, env) {
   if (data === "boost_view" || data === "boost_like") {
     const type = data === "boost_view" ? "views" : "likes";
     await env.DB.prepare("UPDATE users SET pending_action = ? WHERE user_id = ?").bind(type, chatId).run();
-    
     await deleteMessage(env.BOT_TOKEN, chatId, messageId);
     
     const typeName = type === "views" ? "👁️ View" : "❤️ Like";
@@ -268,7 +252,6 @@ async function processBoost(chatId, username, tiktokUrl, user, env, type) {
     return;
   }
 
-  // Processing Message
   const resMsg = await apiCall(env.BOT_TOKEN, "sendMessage", { chat_id: chatId, text: `⏳ ခဏလေးနော် ${username} ရေ... မင်းရဲ့ TikTok ကို Boost ပေးနေတယ်။` });
   await updateLastMsgId(env, chatId, resMsg.result.message_id);
   
@@ -288,7 +271,7 @@ async function processBoost(chatId, username, tiktokUrl, user, env, type) {
 }
 
 // ═══════════════════════════════════════════════
-//  Leofame API ချိတ်ဆက်ခြင်း (Header များ ပိုမိုပြည့်စုံအောင် ပြင်ထားသည်)
+//  Leofame API (Cookie ပါဝင်အောင် ပြင်ဆင်ထားသည်)
 // ═══════════════════════════════════════════════
 async function processLeofame(type, tiktokUrl) {
   const baseUrl = `https://leofame.com/free-tiktok-${type}`;
@@ -297,33 +280,38 @@ async function processLeofame(type, tiktokUrl) {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
     "Referer": baseUrl,
-    "Origin": "https://leofame.com",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "same-origin"
+    "Origin": "https://leofame.com"
   };
+  
   try {
+    // ၁။ GET Request ပို့ပြီး Cookie နဲ့ Token ယူမယ်
     const getRes = await fetch(baseUrl, { headers });
     const html = await getRes.text();
+    const setCookie = getRes.headers.get("set-cookie"); // 🍪 Cookie ကို ယူမယ်
     const tokenMatch = html.match(/name="token"\s+value="([^"]+)"/);
+    
     if (!tokenMatch) throw new Error("Token ရှာမတွေ့ပါ။ (Cloudflare Block ဖြစ်နိုင်ပါသည်)");
+    const token = tokenMatch[1];
     
     const formData = new URLSearchParams();
-    formData.append("token", tokenMatch[1]);
+    formData.append("token", token);
     formData.append("timezone_offset", "Asia/Yangon");
     formData.append("timezone_offset_2", "1234");
     formData.append("free_link", tiktokUrl);
 
-    const postRes = await fetch(baseUrl + "?api=1", { 
-      method: "POST", 
-      headers: {
-        ...headers,
-        "X-Requested-With": "XMLHttpRequest",
-        "Content-Type": "application/x-www-form-urlencoded"
-      }, 
-      body: formData.toString() 
-    });
+    const postHeaders = {
+      ...headers,
+      "X-Requested-With": "XMLHttpRequest",
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Accept": "application/json, text/javascript, */*; q=0.01"
+    };
     
+    // 🍪 ရလာတဲ့ Cookie ကို POST မှာ ထည့်ပို့မယ်
+    if (setCookie) {
+      postHeaders["Cookie"] = setCookie;
+    }
+
+    const postRes = await fetch(baseUrl + "?api=1", { method: "POST", headers: postHeaders, body: formData.toString() });
     const result = await postRes.text();
     
     try {
@@ -332,6 +320,7 @@ async function processLeofame(type, tiktokUrl) {
       if (json.error) return { success: false, message: json.error };
       if (result.trim() === "") return { success: true, message: "ဆာဗာမှ လက်ခံပြီးပါပြီ။" };
     } catch (e) {}
+    
     return { success: false, message: "မသိသော တုံ့ပြန်မှု (Status: " + postRes.status + ")" };
   } catch (error) {
     return { success: false, message: error.message };
