@@ -104,7 +104,7 @@ async function handleMessage(message, env) {
     keyboard: [
       [{ text: "🚀 Boost လုပ်မယ်" }],
       [{ text: "💳 အကောင့်အချက်အလက်" }, { text: "🎁 Daily Reward" }],
-      [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းခေါ်မယ် (Refer)" }]
+      [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းခေါ်မယ်" }]
     ], resize_keyboard: true
   };
 
