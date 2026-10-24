@@ -1,3 +1,8 @@
 name = "zhost-bot1"
 main = "index.js"
 compatibility_date = "2023-10-26"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "zhost_db"
+database_id = "43b2499f-b019-41c4-8162-ba3ce179e3ec"
