@@ -81,6 +81,9 @@ async function handleMessage(message, env) {
   const text = message.text.trim();
   const username = message.from.username || message.from.first_name || "သူငယ်ချင်း";
 
+  // ၁။ User ရိုက်လိုက်တဲ့ စာကို ချက်ချင်း ဖျက်မယ် (Chat သန့်ရှင်းရေး)
+  await deleteMessage(env.BOT_TOKEN, chatId, message.message_id);
+
   let user = await env.DB.prepare("SELECT * FROM users WHERE user_id = ?").bind(chatId).first();
   const isNewUser = !user;
 
@@ -99,18 +102,26 @@ async function handleMessage(message, env) {
     return;
   }
 
-  // Menu ခလုတ်များ (နာမည်အသစ်များ ပါဝင်သည်)
+  // Menu ခလုတ်များ (Icon ပြန်ထည့်ထားသည်)
   const bottomMenu = {
     keyboard: [
       [{ text: "🚀 Boost လုပ်မယ်" }],
-      [{ text: "acc info" }, { text: "🎁 Daily Reward" }],
+      [{ text: "👤 acc info" }, { text: "🎁 Daily Reward" }],
       [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းဖိတ်ခေါ်မည်" }]
     ], resize_keyboard: true
   };
 
+  // ၂။ Link ပို့လား စစ်ဆေးခြင်း (TikTok Link ပဲ လက်ခံမယ်)
   if (text.startsWith("http")) {
+    const isTikTok = /^https?:\/\/(www\.|vm\.|vt\.)?tiktok\.com\//i.test(text);
+    
+    if (!isTikTok) {
+      const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, "⚠️ စိတ်မကောင်းပါဘူး။ TikTok လင့်ခ် (tiktok.com) တွေကိုပဲ လက်ခံပါတယ်နော်။", bottomMenu);
+      await updateLastMsgId(env, chatId, res.result.message_id);
+      return;
+    }
+
     if (user.pending_action === "views" || user.pending_action === "likes") {
-      await deleteMessage(env.BOT_TOKEN, chatId, message.message_id);
       await processBoost(chatId, username, text, user, env, user.pending_action);
     } else {
       const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, "⚠️ ကျေးဇူးပြုပြီး အောက်ခြေက <b>🚀 Boost လုပ်မယ်</b> ခလုတ်ကနေ အရင်ရွေးပေးပါဦး။", bottomMenu);
@@ -132,7 +143,7 @@ async function handleMessage(message, env) {
     return;
   }
 
-  if (text === "acc info") {
+  if (text === "👤 acc info") {
     const refCount = await env.DB.prepare("SELECT COUNT(*) as count FROM users WHERE referred_by = ? AND refer_rewarded = 1").bind(chatId).first();
     const infoText = `👤 <b>Account Info</b>\n\n📛 အမည်: ${username}\n🆔 ID: <code>${chatId}</code>\n💰 လက်ကျန် Coins: <b>${user.coins} Coins</b>\n👥 ကိုယ့်ကနေ ဖိတ်ခေါ်ပြီး Join သွားသူ: <b>${refCount.count} ယောက်</b>`;
     const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, infoText, bottomMenu);
@@ -177,6 +188,7 @@ async function handleMessage(message, env) {
     return;
   }
 
+  // အကယ်၍ အပေါ်က ဘာနဲ့မှ မကိုက်ညီရင်
   const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, `😅 နားမလည်လိုက်ဘူးနော်။ အောက်က Menu လေးတွေကို နှိပ်ကြည့်ပါဦး။`, bottomMenu);
   await updateLastMsgId(env, chatId, res.result.message_id);
 }
@@ -196,7 +208,7 @@ async function handleCallback(query, env) {
   const bottomMenu = {
     keyboard: [
       [{ text: "🚀 Boost လုပ်မယ်" }],
-      [{ text: "acc info" }, { text: "🎁 Daily Reward" }],
+      [{ text: "👤 acc info" }, { text: "🎁 Daily Reward" }],
       [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းဖိတ်ခေါ်မည်" }]
     ], resize_keyboard: true
   };
@@ -264,7 +276,7 @@ async function processBoost(chatId, username, tiktokUrl, user, env, type) {
   const bottomMenu = {
     keyboard: [
       [{ text: "🚀 Boost လုပ်မယ်" }],
-      [{ text: "acc info" }, { text: "🎁 Daily Reward" }],
+      [{ text: "👤 acc info" }, { text: "🎁 Daily Reward" }],
       [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းဖိတ်ခေါ်မည်" }]
     ], resize_keyboard: true
   };
