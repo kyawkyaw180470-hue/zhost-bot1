@@ -99,12 +99,12 @@ async function handleMessage(message, env) {
     return;
   }
 
-  // Menu ခလုတ်များ (VIP ခလုတ် အသစ်ပါဝင်သည်)
+  // Menu ခလုတ်များ (နာမည်အသစ်များ ပါဝင်သည်)
   const bottomMenu = {
     keyboard: [
       [{ text: "🚀 Boost လုပ်မယ်" }],
-      [{ text: "💳 အကောင့်အချက်အလက်" }, { text: "🎁 Daily Reward" }],
-      [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းခေါ်မယ်" }]
+      [{ text: "acc info" }, { text: "🎁 Daily Reward" }],
+      [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းဖိတ်ခေါ်မည်" }]
     ], resize_keyboard: true
   };
 
@@ -132,9 +132,9 @@ async function handleMessage(message, env) {
     return;
   }
 
-  if (text === "💳 အကောင့်အချက်အလက်") {
+  if (text === "acc info") {
     const refCount = await env.DB.prepare("SELECT COUNT(*) as count FROM users WHERE referred_by = ? AND refer_rewarded = 1").bind(chatId).first();
-    const infoText = `👤 <b>Account Info</b>\n\n📛 အမည်: ${username}\n🆔 ID: <code>${chatId}</code>\n💰 လက်ကျန် Coins: <b>${user.coins} Coins</b>\n👥 ကိုယ့်ကနေ Refer လုပ်ပြီး Join သွားသူ: <b>${refCount.count} ယောက်</b>`;
+    const infoText = `👤 <b>Account Info</b>\n\n📛 အမည်: ${username}\n🆔 ID: <code>${chatId}</code>\n💰 လက်ကျန် Coins: <b>${user.coins} Coins</b>\n👥 ကိုယ့်ကနေ ဖိတ်ခေါ်ပြီး Join သွားသူ: <b>${refCount.count} ယောက်</b>`;
     const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, infoText, bottomMenu);
     await updateLastMsgId(env, chatId, res.result.message_id);
     return;
@@ -154,13 +154,11 @@ async function handleMessage(message, env) {
     return;
   }
 
-  // 💎 VIP စနစ် အသစ်
   if (text === "💎 VIP ဝင်မယ်") {
     const vipText = `💎 <b>ZHOST VIP Package</b>\n\n💰 စျေးနှုန်း: 2000ks\n🎁 ရရှိမည့် အကျိုးခံစားခွင့်: 500 Coins\n\nVIP ဝင်လိုပါက @ZawMyoNaing_Official ဆီကို ဆက်သွယ်ပေးပါ။\n\n<i>(သင့်တောင်းဆိုမှုကို Admin ဆီသို့ အသိပေးပို့ထားပါသည်။)</i>`;
     const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, vipText, bottomMenu);
     await updateLastMsgId(env, chatId, res.result.message_id);
 
-    // Admin ဆီကို အသိပေးစာ ပို့မယ်
     await apiCall(env.BOT_TOKEN, "sendMessage", {
       chat_id: ADMIN_ID,
       text: `🔔 <b>VIP တောင်းဆိုမှု အသစ်!</b>\n\n👤 အမည်: ${username}\n🆔 ID: <code>${chatId}</code>\n\nဒီ User ကို VIP ပေးမလား?`,
@@ -171,9 +169,9 @@ async function handleMessage(message, env) {
     return;
   }
 
-  if (text === "👥 သူငယ်ချင်းခေါ်မယ် (Refer)") {
+  if (text === "👥 သူငယ်ချင်းဖိတ်ခေါ်မည်") {
     const refLink = `https://t.me/${BOT_USERNAME}?start=ref_${chatId}`;
-    const refText = `👥 <b>Refer & Earn</b>\n\nသူငယ်ချင်းတွေကို ဒီ Link လေး Share ပေးလိုက်ပါ။\nသူတို့ <b>Channel Join လုပ်တာနဲ့</b> သင့်ဆီကို <b>4 Coins</b> ရောက်လာပါလိမ့်မယ်။\n\n<code>${refLink}</code>`;
+    const refText = `👥 <b>သူငယ်ချင်း ဖိတ်ခေါ်ခြင်း</b>\n\nသူငယ်ချင်းတွေကို ဒီ Link လေး Share ပေးလိုက်ပါ။\nသူတို့ <b>Channel Join လုပ်တာနဲ့</b> သင့်ဆီကို <b>4 Coins</b> ရောက်လာပါလိမ့်မယ်။\n\n<code>${refLink}</code>`;
     const res = await sendCleanMessage(env.BOT_TOKEN, chatId, user, refText, bottomMenu);
     await updateLastMsgId(env, chatId, res.result.message_id);
     return;
@@ -198,12 +196,11 @@ async function handleCallback(query, env) {
   const bottomMenu = {
     keyboard: [
       [{ text: "🚀 Boost လုပ်မယ်" }],
-      [{ text: "💳 အကောင့်အချက်အလက်" }, { text: "🎁 Daily Reward" }],
-      [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းခေါ်မယ် (Refer)" }]
+      [{ text: "acc info" }, { text: "🎁 Daily Reward" }],
+      [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းဖိတ်ခေါ်မည်" }]
     ], resize_keyboard: true
   };
 
-  // 👑 Admin မှ VIP Confirm နှိပ်ခြင်း
   if (data.startsWith("admin_vip_confirm_")) {
     if (chatId !== ADMIN_ID) {
       await apiCall(env.BOT_TOKEN, "answerCallbackQuery", { callback_query_id: query.id, text: "⛔ Admin ပဲ နှိပ်လို့ရပါတယ်။", show_alert: true });
@@ -211,17 +208,13 @@ async function handleCallback(query, env) {
     }
 
     const targetUserId = data.replace("admin_vip_confirm_", "");
-    
-    // User ဆီကို 500 Coins ထည့်မယ်
     await env.DB.prepare("UPDATE users SET coins = coins + 500 WHERE user_id = ?").bind(targetUserId).run();
 
-    // User ဆီကို အသိပေးစာ ပို့မယ်
     await apiCall(env.BOT_TOKEN, "sendMessage", {
       chat_id: targetUserId,
       text: "🎉 <b>ဂုဏ်ယူပါတယ်! သင်ဟာ ZHOST VIP ဖြစ်သွားပါပြီ။</b>\n\n💰 သင့်အကောင့်ထဲကို <b>500 Coins</b> ထည့်သွင်းပြီးပါပြီ။"
     });
 
-    // Admin ဆီကို အောင်မြင်ကြောင်း ပြန်ပြမယ်
     await apiCall(env.BOT_TOKEN, "editMessageText", {
       chat_id: ADMIN_ID,
       message_id: messageId,
@@ -271,8 +264,8 @@ async function processBoost(chatId, username, tiktokUrl, user, env, type) {
   const bottomMenu = {
     keyboard: [
       [{ text: "🚀 Boost လုပ်မယ်" }],
-      [{ text: "💳 အကောင့်အချက်အလက်" }, { text: "🎁 Daily Reward" }],
-      [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းခေါ်မယ် (Refer)" }]
+      [{ text: "acc info" }, { text: "🎁 Daily Reward" }],
+      [{ text: "💎 VIP ဝင်မယ်" }, { text: "👥 သူငယ်ချင်းဖိတ်ခေါ်မည်" }]
     ], resize_keyboard: true
   };
 
@@ -316,7 +309,7 @@ async function processBoost(chatId, username, tiktokUrl, user, env, type) {
 }
 
 // ═══════════════════════════════════════════════
-//  Leofame API (Cookie ပါဝင်အောင် ပြင်ဆင်ထားသည်)
+//  Leofame API
 // ═══════════════════════════════════════════════
 async function processLeofame(type, tiktokUrl) {
   const baseUrl = `https://leofame.com/free-tiktok-${type}`;
